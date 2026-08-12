@@ -179,8 +179,6 @@
 </div>
 
 <script>
-  // Feito por outra pessoa como estudo simples de consumo da API ViaCEP
-
   const inputCep = document.getElementById('cep');
   const btnBuscar = document.getElementById('btnBuscar');
   const mensagem = document.getElementById('mensagem');
@@ -194,14 +192,12 @@
   const freteDias = document.getElementById('freteDias');
   const freteValor = document.getElementById('freteValor');
 
-  // Permite digitar somente números no campo de CEP
+  // permite digitar somente números no campo de CEP
   inputCep.addEventListener('input', () => {
     inputCep.value = inputCep.value.replace(/\D/g, '');
   });
 
   btnBuscar.addEventListener('click', buscarCep);
-
-  // Também permite buscar apertando Enter
   inputCep.addEventListener('keydown', (evento) => {
     if (evento.key === 'Enter') {
       buscarCep();
@@ -260,8 +256,6 @@
     inputEstado.value = '';
     blocoFrete.classList.add('oculto');
   }
-
-  // Calcula um frete simples com base no estado de destino
   // Origem fixa: Curitiba - PR
   function calcularFrete(uf) {
     const TAXA_FIXA = 8;
