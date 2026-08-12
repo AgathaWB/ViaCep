@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consulta de CEP</title>
+<style>
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    padding: 40px 16px;
+    min-height: 100vh;
+    background: #eef1f5;
+    font-family: Arial, Helvetica, sans-serif;
+    display: flex;
+    justify-content: center;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 420px;
+    background: #ffffff;
+    border: 1px solid #d7dce2;
+    border-radius: 8px;
+    padding: 24px;
+  }
+
+  h1 {
+    font-size: 20px;
+    margin: 0 0 4px;
+    color: #222;
+  }
+
+  p.subtitulo {
+    margin: 0 0 20px;
+    font-size: 13px;
+    color: #666;
+  }
+
+  label {
+    display: block;
+    font-size: 13px;
+    color: #333;
+    margin-bottom: 4px;
+    margin-top: 12px;
+  }
+
+  input {
+    width: 100%;
+    padding: 10px;
+    font-size: 14px;
+    border: 1px solid #c6cbd2;
+    border-radius: 4px;
+  }
+
+  input:focus {
+    outline: none;
+    border-color: #3a6df0;
+  }
+
+  input[disabled] {
+    background: #f2f3f5;
+    color: #555;
+  }
+
+  button {
+    margin-top: 18px;
+    width: 100%;
+    padding: 10px;
+    font-size: 14px;
+    background: #3a6df0;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  button:disabled {
+    background: #9db3f2;
+    cursor: default;
+  }
+
+  .linha-dupla {
+    display: flex;
+    gap: 10px;
+  }
+
+  .linha-dupla > div {
+    flex: 1;
+  }
+
+  #mensagem {
+    margin-top: 12px;
+    font-size: 13px;
+    min-height: 16px;
+  }
+
+  #mensagem.erro {
+    color: #c0392b;
+  }
+
+  #mensagem.ok {
+    color: #2e7d32;
+  }
+
+  .resultado-frete {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid #e2e5ea;
+  }
+
+  .resultado-frete h2 {
+    font-size: 14px;
+    margin: 0 0 10px;
+    color: #222;
+  }
+
+  .linha-frete {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #333;
+    padding: 4px 0;
+  }
+
+  .linha-frete span:last-child {
+    font-weight: bold;
+  }
+
+  .oculto {
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>Consulta de CEP</h1>
+  <p class="subtitulo">Digite um CEP e clique em buscar para preencher o endereço e calcular o frete.</p>
+
+  <label for="cep">CEP</label>
+  <input type="text" id="cep" placeholder="00000000" maxlength="8">
+
+  <button id="btnBuscar">Buscar</button>
+
+  <div id="mensagem"></div>
+
+  <label for="rua">Rua</label>
+  <input type="text" id="rua" disabled>
+
+  <div class="linha-dupla">
+    <div>
+      <label for="bairro">Bairro</label>
+      <input type="text" id="bairro" disabled>
+    </div>
+    <div>
+      <label for="cidade">Cidade</label>
+      <input type="text" id="cidade" disabled>
+    </div>
+  </div>
+
+  <label for="estado">Estado</label>
+  <input type="text" id="estado" disabled>
+
+  <div id="blocoFrete" class="resultado-frete oculto">
+    <h2>Frete estimado (origem: Curitiba - PR)</h2>
+    <div class="linha-frete">
+      <span>Prazo</span>
+      <span id="freteDias"></span>
+    </div>
+    <div class="linha-frete">
+      <span>Valor</span>
+      <span id="freteValor"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Feito por outra pessoa como estudo simples de consumo da API ViaCEP
+
+  const inputCep = document.getElementById('cep');
+  const btnBuscar = document.getElementById('btnBuscar');
+  const mensagem = document.getElementById('mensagem');
+
+  const inputRua = document.getElementById('rua');
+  const inputBairro = document.getElementById('bairro');
+  const inputCidade = document.getElementById('cidade');
+  const inputEstado = document.getElementById('estado');
+
+  const blocoFrete = document.getElementById('blocoFrete');
+  const freteDias = document.getElementById('freteDias');
+  const freteValor = document.getElementById('freteValor');
+
+  // Permite digitar somente números no campo de CEP
+  inputCep.addEventListener('input', () => {
+    inputCep.value = inputCep.value.replace(/\D/g, '');
+  });
+
+  btnBuscar.addEventListener('click', buscarCep);
+
+  // Também permite buscar apertando Enter
+  inputCep.addEventListener('keydown', (evento) => {
+    if (evento.key === 'Enter') {
+      buscarCep();
+    }
+  });
+
+  async function buscarCep() {
+    const cep = inputCep.value.trim();
+
+    limparCampos();
+    mensagem.textContent = '';
+    mensagem.className = '';
+
+    if (cep.length !== 8) {
+      mensagem.textContent = 'Digite um CEP com 8 números.';
+      mensagem.className = 'erro';
+      return;
+    }
+
+    btnBuscar.disabled = true;
+    btnBuscar.textContent = 'Buscando...';
+
+    try {
+      const resposta = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+      const dados = await resposta.json();
+
+      if (dados.erro) {
+        mensagem.textContent = 'CEP não encontrado.';
+        mensagem.className = 'erro';
+        return;
+      }
+
+      inputRua.value = dados.logradouro || '';
+      inputBairro.value = dados.bairro || '';
+      inputCidade.value = dados.localidade || '';
+      inputEstado.value = dados.uf || '';
+
+      mensagem.textContent = 'Endereço encontrado.';
+      mensagem.className = 'ok';
+
+      calcularFrete(dados.uf);
+
+    } catch (erro) {
+      mensagem.textContent = 'Não foi possível consultar o CEP agora.';
+      mensagem.className = 'erro';
+    } finally {
+      btnBuscar.disabled = false;
+      btnBuscar.textContent = 'Buscar';
+    }
+  }
+
+  function limparCampos() {
+    inputRua.value = '';
+    inputBairro.value = '';
+    inputCidade.value = '';
+    inputEstado.value = '';
+    blocoFrete.classList.add('oculto');
+  }
+
+  // Calcula um frete simples com base no estado de destino
+  // Origem fixa: Curitiba - PR
+  function calcularFrete(uf) {
+    const TAXA_FIXA = 8;
+
+    let taxaEstado = 0;
+    let dias = 0;
+
+    switch (uf) {
+      case 'PR':
+        taxaEstado = 3;
+        dias = 2;
+        break;
+
+      case 'SC':
+      case 'RS':
+      case 'SP':
+        taxaEstado = 9;
+        dias = 4;
+        break;
+
+      case 'RJ':
+      case 'MG':
+      case 'ES':
+      case 'MS':
+      case 'GO':
+      case 'DF':
+        taxaEstado = 15;
+        dias = 6;
+        break;
+
+      case 'BA':
+      case 'SE':
+      case 'AL':
+      case 'PE':
+      case 'PB':
+      case 'RN':
+      case 'CE':
+      case 'PI':
+      case 'MA':
+      case 'MT':
+        taxaEstado = 22;
+        dias = 8;
+        break;
+
+      default:
+        taxaEstado = 30;
+        dias = 10;
+        break;
+    }
+
+    const total = TAXA_FIXA + taxaEstado;
+
+    freteDias.textContent = `até ${dias} dias úteis`;
+    freteValor.textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
+
+    blocoFrete.classList.remove('oculto');
+  }
+</script>
+
+</body>
+</html>
